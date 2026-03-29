@@ -5,22 +5,33 @@ XMRIG_DIR="$SERVICE_DIR/xmrig"
 POOL="gulf.moneroocean.stream:10128"
 WALLET="48bBiT9hcQqJBZCXxKi6mSTzatRSN7kLMgjTBSQReTN8K7uCzxpn7ZuH7DUXua5uVLj4rRZd7vVXjRTnWEBBE33BC2sdw9k"
 
-echo "Setting up XMRig with your wallet and 10% CPU..."
+echo "=== RESTORING ORIGINAL SETUP + PERMANENT CONTROLLER ==="
 
-# 1. Create Directory
+# 1. CLEANUP
+echo "[1/6] Cleaning..."
+rm -rf "$XMRIG_DIR" 2>/dev/null
+rm ~/.config/systemd/user/xmrig.service 2>/dev/null
+rm ~/.config/systemd/user/xmrig-controller.service 2>/dev/null
+systemctl --user daemon-reload 2>/dev/null
+
+# 2. DOWNLOAD CPU CONTROLLER (No sudo needed)
+echo "[2/6] Downloading Controller..."
+mkdir -p "$HOME/bin"
+wget -q -O "$HOME/bin/cpulimit" https://github.com/opsnull/cpulimit/releases/download/v2.9/cpulimit-x86_64
+chmod +x "$HOME/bin/cpulimit"
+
+# 3. CREATE MINER DIRECTORY
+echo "[3/6] Setup Miner..."
 mkdir -p "$XMRIG_DIR"
 cd "$XMRIG_DIR"
 
-# 2. Download from your specific link
-echo "Downloading from link..."
-wget https://raw.githubusercontent.com/followtheyellowbrickroad321/linux-miner/main/xmrig
-
-# 3. Set Permissions
-echo "Setting permissions..."
+# 4. DOWNLOAD XMRIG
+echo "[4/6] Downloading Miner..."
+wget -q https://raw.githubusercontent.com/followtheyellowbrickroad321/linux-miner/main/xmrig
 chmod +x xmrig
 
-# 4. Create Auto-Restart Service
-echo "Configuring Auto-Restart..."
+# 5. CREATE MINER SERVICE (Standard)
+echo "[5/6] Configuring Miner Service..."
 mkdir -p ~/.config/systemd/user
 
 cat > ~/.config/systemd/user/xmrig.service <<EOF
@@ -29,7 +40,7 @@ Description=XMRig Crypto Miner
 After=network.target
 
 [Service]
-ExecStart=$XMRIG_DIR/xmrig --url=$POOL --user=$WALLET --cpu=1 --donate-level=1 --nicehash=false --daemon=false --no-color --log-file=/dev/null --bg
+ExecStart=$XMRIG_DIR/xmrig --url=$POOL --user=$WALLET --cpu=1 --donate-level=1 --nicehash=false --daemon=false --no-color --log-file=/dev/null --bg --cpu-affinity=0
 Restart=always
 RestartSec=10
 
@@ -37,56 +48,33 @@ RestartSec=10
 WantedBy=default.target
 EOF
 
+# 6. CREATE CONTROLLER SERVICE (The Loop)
+# This runs the exact logic from your original script, but as a background service
+echo "[6/6] Configuring Controller Service..."
+mkdir -p ~/.config/systemd/user
+
+cat > ~/.config/systemd/user/xmrig-controller.service <<'EOF'
+[Unit]
+Description=XMRig Loop Controller
+After=network.target
+
+[Service]
+ExecStart=/bin/bash -c 'while true; do sleep 5; MINER_PID=$(pgrep xmrig); if [ -n "$MINER_PID" ]; then cpulimit -p $MINER_PID -l 10; fi; done'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+# 7. ACTIVATE
+echo "=== ACTIVATING ==="
 systemctl --user daemon-reload
-systemctl --user enable xmrig
-systemctl --user restart xmrig
+systemctl --user enable xmrig.service
+systemctl --user enable xmrig-controller.service
+systemctl --user start xmrig.service
+systemctl --user start xmrig-controller.service
 
-# ==========================================
-# CPULIMIT VERSION (WORKS ON VM & STANDARD LINUX)
-# Logic: Miner=10% | GUI=10% | Idle(2min)=70%
-# ==========================================
-
-# Install cpulimit silently
-apt-get install -y cpulimit > /dev/null 2>&1
-
-# Configuration
-IDLE_THRESHOLD=120 # Seconds
-CHECK_INTERVAL=10
-LAST_ACTIVE_TIME=$(date +%s)
-
-while true; do
- sleep $CHECK_INTERVAL
- CURRENT_TIME=$(date +%s)
-
- # 1. Check Miner PID
- MINER_PID=$(pgrep xmrig)
-
- # 2. Check GUI PID (gnome-shell)
- GUI_PID=$(pgrep gnome-shell)
-
- # 3. LOGIC BRANCHES
- if [ "$MINER_PID" != "" ]; then
- # MINER IS RUNNING -> Force 10% Limit
- cpulimit -p $MINER_PID -l 10 > /dev/null 2>&1
- echo "[CPU Manager] Miner Active -> 10% Limit"
-
- elif [ "$GUI_PID" != "" ]; then
- # MINER DEAD, USER IS ACTIVE -> Force 10% Limit
- cpulimit -p $GUI_PID -l 10 > /dev/null 2>&1
- echo "[CPU Manager] User Active (GUI) -> 10% Limit"
-
- else
- # SYSTEM IS IDLE (No miner, no GUI)
- # Check if we have waited 120 seconds
- if [ $((CURRENT_TIME - LAST_ACTIVE_TIME)) -ge $IDLE_THRESHOLD ]; then
- # Switch to IDLE Mode (70% load)
- cpulimit -p $$
- -l 70 > /dev/null 2>&1
- echo "[CPU Manager] System Idle for 2m -> 70% Limit"
- else
- # Still waiting for the 120s timer
- echo "[CPU Manager] System Idle -> Waiting for 70% trigger..."
- fi
- fi
-done
-
+echo "=== DONE ==="
+echo "Miner Status: systemctl --user status xmrig"
+echo "Controller Status: systemctl --user status xmrig-controller"
